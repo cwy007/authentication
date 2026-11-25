@@ -7,7 +7,7 @@ from sqlmodel import select
 
 from database import SessionDep, create_db_and_tables
 from models import User, UserCreate, UserResponse
-from security import DUMMY_HASH, hash_password, verify_password
+from security import DUMMY_HASH, create_access_token, hash_password, verify_password
 
 
 @asynccontextmanager
@@ -56,4 +56,7 @@ def login(
     if not verify_password(form_data.password, user.hashed_password):
         raise credential_exception
 
-    return {"access_token": "jwt_placeholder", "token_type": "bearer"}
+    return {
+        "access_token": create_access_token({"sub": user.email}),
+        "token_type": "bearer",
+    }
