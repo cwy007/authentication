@@ -1,11 +1,13 @@
 from contextlib import asynccontextmanager
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import select
 
 from database import SessionDep, create_db_and_tables
 from models import User, UserCreate, UserResponse
-from security import hash_password
+from security import DUMMY_HASH, hash_password, verify_password
 
 
 @asynccontextmanager
@@ -34,3 +36,24 @@ def register(session: SessionDep, user_data: UserCreate):
     session.commit()
     session.refresh(new_user)
     return new_user
+
+
+@app.post("/token", status_code=status.HTTP_200_OK)
+def login(
+    session: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
+):
+    user = session.exec(select(User).where(User.email == form_data.username)).first()
+    credential_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    if not user:
+        verify_password(form_data.password, DUMMY_HASH)
+        raise credential_exception
+
+    if not verify_password(form_data.password, user.hashed_password):
+        raise credential_exception
+
+    return {"access_token": "jwt_placeholder", "token_type": "bearer"}
