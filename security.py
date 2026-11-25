@@ -12,6 +12,7 @@ DUMMY_HASH = password_hash.hash("dummy-password-for-timing-attack-prevention")
 
 ACCESS_TOKEN_ALGORITHM = "HS256"  # 访问令牌使用的算法
 ACCESS_TOKEN_EXPIRATION_TIME_IN_MINUTES = 10  # 令牌过期时间，单位为分钟
+REFRESH_TOKEN_EXPIRATION_TIME_IN_DAYS = 7  # 刷新令牌过期时间，单位为天
 ACCESS_TOKEN_SECRET = settings.JWT_SECRET_KEY
 
 
@@ -32,7 +33,18 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     expire = now + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRATION_TIME_IN_MINUTES)
     )
-    to_encode.update({"exp": expire, "iat": now})
+    to_encode.update({"exp": expire, "iat": now, "type": "access"})
+    return jwt.encode(to_encode, ACCESS_TOKEN_SECRET, algorithm=ACCESS_TOKEN_ALGORITHM)
+
+
+# 生成刷新令牌
+def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> str:
+    to_encode = data.copy()
+    now = datetime.now(UTC)
+    expire = now + (
+        expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRATION_TIME_IN_DAYS)
+    )
+    to_encode.update({"exp": expire, "iat": now, "type": "refresh"})
     return jwt.encode(to_encode, ACCESS_TOKEN_SECRET, algorithm=ACCESS_TOKEN_ALGORITHM)
 
 

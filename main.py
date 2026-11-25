@@ -10,6 +10,7 @@ from models import User, UserCreate, UserResponse, UserUpdate
 from security import (
     DUMMY_HASH,
     create_access_token,
+    create_refresh_token,
     decode_access_token,
     hash_password,
     verify_password,
@@ -37,7 +38,7 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     payload = decode_access_token(token)
-    if not payload:
+    if not payload or payload.get("type") != "access":
         raise invalid_token_exception
     user = session.exec(select(User).where(User.email == payload.get("sub"))).first()
     if not user:
@@ -87,6 +88,7 @@ def login(
 
     return {
         "access_token": create_access_token({"sub": user.email}),
+        "refresh_token": create_refresh_token({"sub": user.email}),
         "token_type": "bearer",
     }
 
