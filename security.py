@@ -49,7 +49,7 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> 
 
 
 # 解码访问令牌
-def decode_access_token(token: str) -> dict | None:
+def decode_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(
             token, ACCESS_TOKEN_SECRET, algorithms=[ACCESS_TOKEN_ALGORITHM]
