@@ -34,3 +34,14 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     )
     to_encode.update({"exp": expire, "iat": now})
     return jwt.encode(to_encode, ACCESS_TOKEN_SECRET, algorithm=ACCESS_TOKEN_ALGORITHM)
+
+
+# 解码访问令牌
+def decode_access_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(
+            token, ACCESS_TOKEN_SECRET, algorithms=[ACCESS_TOKEN_ALGORITHM]
+        )
+        return payload
+    except jwt.PyJWTError:
+        return None
