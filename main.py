@@ -2,12 +2,14 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlmodel import select
 
 from database import SessionDep, create_db_and_tables
 from models import User, UserCreate, UserResponse
 from security import DUMMY_HASH, create_access_token, hash_password, verify_password
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 @asynccontextmanager
@@ -60,3 +62,8 @@ def login(
         "access_token": create_access_token({"sub": user.email}),
         "token_type": "bearer",
     }
+
+
+@app.get("/test-token")
+def test_token(token: Annotated[str, Depends(oauth2_scheme)]):
+    return {"token": token}
