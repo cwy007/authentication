@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlmodel import select
 
 from database import SessionDep, create_db_and_tables
-from models import User, UserCreate, UserResponse
+from models import User, UserCreate, UserResponse, UserUpdate
 from security import (
     DUMMY_HASH,
     create_access_token,
@@ -31,20 +31,17 @@ def get_current_user(
     session: SessionDep,
     token: Annotated[str, Depends(oauth2_scheme)],
 ):
+    invalid_token_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     payload = decode_access_token(token)
     if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise invalid_token_exception
     user = session.exec(select(User).where(User.email == payload.get("sub"))).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise invalid_token_exception
     return user
 
 
@@ -101,4 +98,28 @@ def test_token(token: Annotated[str, Depends(oauth2_scheme)]):
 
 @app.get("/me", status_code=status.HTTP_200_OK, response_model=UserResponse)
 def read_current_user(current_user: CurrentUser):
+    return current_user
+
+
+@app.patch("/me", status_code=status.HTTP_200_OK, response_model=UserResponse)
+def update_current_user(
+    session: SessionDep, current_user: CurrentUser, update_payload: UserUpdate
+):
+    if not update_payload.email:
+        return current_user
+
+    existing_user = session.exec(
+        select(User).where(User.email == update_payload.email)
+    ).first()
+    if existing_user and existing_user.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already taken",
+        )
+    current_user.email = update_payload.email
+
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+
     return current_user
