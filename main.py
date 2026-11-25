@@ -7,7 +7,13 @@ from sqlmodel import select
 
 from database import SessionDep, create_db_and_tables
 from models import User, UserCreate, UserResponse
-from security import DUMMY_HASH, create_access_token, hash_password, verify_password
+from security import (
+    DUMMY_HASH,
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    verify_password,
+)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -19,6 +25,30 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+def get_current_user(
+    session: SessionDep,
+    token: Annotated[str, Depends(oauth2_scheme)],
+):
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user = session.exec(select(User).where(User.email == payload.get("sub"))).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 @app.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
@@ -67,3 +97,8 @@ def login(
 @app.get("/test-token")
 def test_token(token: Annotated[str, Depends(oauth2_scheme)]):
     return {"token": token}
+
+
+@app.get("/me", status_code=status.HTTP_200_OK, response_model=UserResponse)
+def read_current_user(current_user: CurrentUser):
+    return current_user
