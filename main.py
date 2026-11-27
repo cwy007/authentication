@@ -9,6 +9,7 @@ from sqlmodel import select
 
 from database import SessionDep, create_db_and_tables
 from models import (
+    PasswordResetConfirm,
     PasswordResetRequest,
     PasswordResetToken,
     User,
@@ -177,3 +178,34 @@ def request_password_reset(session: SessionDep, payload: PasswordResetRequest):
 
     # Here you would send the token to the user's email
     return {"message": "If the email exists, a password reset link has been sent."}
+
+
+@app.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
+def confirm_password_reset(session: SessionDep, payload: PasswordResetConfirm):
+    reset_token = session.exec(
+        select(PasswordResetToken).where(PasswordResetToken.token == payload.token)
+    ).first()
+    if (
+        not reset_token
+        or reset_token.used
+        or reset_token.expires_at < datetime.now(UTC)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired token",
+        )
+
+    user = session.exec(select(User).where(User.id == reset_token.user_id)).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid token",
+        )
+
+    user.hashed_password = hash_password(payload.new_password)
+    reset_token.used = True
+    session.add(user)
+    session.add(reset_token)
+    session.commit()
+
+    return {"message": "Password has been reset successfully."}
