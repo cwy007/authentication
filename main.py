@@ -1,4 +1,6 @@
+import secrets
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, status
@@ -6,7 +8,14 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlmodel import select
 
 from database import SessionDep, create_db_and_tables
-from models import User, UserCreate, UserResponse, UserUpdate
+from models import (
+    PasswordResetRequest,
+    PasswordResetToken,
+    User,
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+)
 from security import (
     DUMMY_HASH,
     create_access_token,
@@ -150,3 +159,21 @@ def read_dashboard():
 
 
 app.include_router(user_router)
+
+
+@app.post("/password-reset/request", status_code=status.HTTP_200_OK)
+def request_password_reset(session: SessionDep, payload: PasswordResetRequest):
+    user = session.exec(select(User).where(User.email == payload.email)).first()
+    if not user or not user.id:
+        return {"message": "If the email exists, a password reset link has been sent."}
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(UTC) + timedelta(minutes=10)
+    reset_token = PasswordResetToken(
+        user_id=user.id, token=token, expires_at=expires_at
+    )
+    session.add(reset_token)
+    session.commit()
+
+    # Here you would send the token to the user's email
+    return {"message": "If the email exists, a password reset link has been sent."}
