@@ -1,7 +1,7 @@
 import secrets
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -57,6 +57,20 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+Role = Literal["user", "admin"]
+
+
+class RoleRequired:
+    def __init__(self, role: Role):
+        self.role = role
+
+    def __call__(self, current_user: CurrentUser):
+        if current_user.role != self.role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
+            )
 
 
 @app.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
